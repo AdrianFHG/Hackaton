@@ -1,10 +1,14 @@
 from fastapi import FastAPI,Request,Query
+from datetime import datetime
 import pandas as pd
 import numpy as np 
 import joblib
 import time
 import os
 import httpx
+import json
+
+CACHE_FILE = "ai_cache.json"
 
 df = pd.read_csv("alibaba_transactions.csv")
 df["timestamp"] = pd.to_datetime(df["timestamp"])
@@ -70,6 +74,7 @@ app = FastAPI()
 
 api_key = "sk-9dbfdef5a1864d14a120f1b1009f0137" 
 url = "https://dashscope-intl.aliyuncs.com/api/v1/services/aigc/text-generation/generation"
+
 async def get_ai_recommendation(prompt_content: str):
     
     headers = {"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"}
@@ -86,6 +91,31 @@ async def get_ai_recommendation(prompt_content: str):
             return "Saran otomatis tidak tersedia saat ini."
     except Exception:
         return "Sistem AI sedang sibuk."
+
+
+async def get_cached_ai_recommendation(cache_key: str, prompt_content: str):
+    cache_data = {}
+    if os.path.exists(CACHE_FILE):
+        with open(CACHE_FILE, "r") as f:
+            cache_data = json.load(f)
+
+    today = datetime.now().strftime("%Y-%m-%d")
+    
+    if cache_key in cache_data:
+        cached_entry = cache_data[cache_key]
+        if cached_entry["date"] == today:
+            print(f"--- [CACHE] Mengambil respons {cache_key} ---")
+            return cached_entry["content"]
+
+    # JIKA TIDAK ADA CACHE, PANGGIL FUNGSI NOMOR 1
+    print(f"--- [API] Memanggil Qwen untuk {cache_key} ---")
+    new_response = await get_ai_recommendation(prompt_content)
+    
+    cache_data[cache_key] = {"date": today, "content": new_response}
+    with open(CACHE_FILE, "w") as f:
+        json.dump(cache_data, f)
+        
+    return new_response
 
 def calculate_fear_greed(df_monthly, status_percent):
     fg_scores = []
@@ -190,7 +220,7 @@ async def dashboard():
     Focus on increasing profit, revenue stability, and operational efficiency.
     Do not restate the data, be concise (max 120 words).
     """
-    ai_advice = await get_ai_recommendation(prompt)
+    ai_advice = await get_cached_ai_recommendation("dashboard_advice",prompt)
     
     return {
         "this_month_revenue": int(this_month["total_revenue"]),
@@ -300,7 +330,7 @@ async def predict_revenue():
     Focus on operational, financial, or marketing measures.
     Keep answer concise, practical, max 100 words.
     """
-    ai_insight = await get_ai_recommendation(prompt)
+    ai_insight = await get_cached_ai_recommendation("predict_insight",prompt)
     
     return {
         "cards": {
@@ -393,7 +423,7 @@ async def fraud_detection():
     - Focus on security and operational alert
     - Highlight urgent/high-risk items first
     """
-    ai_alert = await get_ai_recommendation(prompt)
+    ai_alert = await get_cached_ai_recommendation("fraud_alert",prompt)
 
     return {
         "fraud_risk_score": avg_risk_score, # Ini yang akan muncul "32.0"
@@ -421,3 +451,11 @@ async def fraud_detection():
         
         "security alert": ai_alert,
     }
+    
+    
+@app.get("/clear-cache")
+def clear_cache():
+    if os.path.exists(CACHE_FILE):
+        os.remove(CACHE_FILE)
+        return {"status": "success", "message": "Cache dihapus. Request berikutnya akan memanggil AI baru."}
+    return {"status": "skipped", "message": "Cache memang sudah kosong."}
