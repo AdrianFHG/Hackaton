@@ -1,0 +1,4 @@
+.env
+ai_cache.json
+__pycache__/
+*.pkl

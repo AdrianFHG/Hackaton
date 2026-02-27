@@ -7,7 +7,9 @@ import time
 import os
 import httpx
 import json
+from dotenv import load_dotenv
 
+load_dotenv()
 CACHE_FILE = "ai_cache.json"
 
 df = pd.read_csv("alibaba_transactions.csv")
@@ -19,7 +21,7 @@ df["hour"] = df["timestamp"].dt.hour
 df_monthly = df.groupby("month").agg(
     total_revenue = ("settlement_amount", "sum"),
     total_expense =("fee_amount", "sum"),
-    total_transactions =("trans_id", "sum"),
+    total_transactions =("trans_id", "count"),
     avg_amount = ("settlement_amount", "mean"),    
     top_category = ("alibaba_category", lambda x: x.value_counts().idxmax()),
     top_payment = ("payment_method", lambda x: x.value_counts().idxmax()),
@@ -28,7 +30,7 @@ df_monthly = df.groupby("month").agg(
 df_daily = df.groupby("date").agg(
     total_revenue = ("settlement_amount", "sum"),
     total_expense =("fee_amount", "sum"),
-    total_transactions =("trans_id", "sum"),
+    total_transactions =("trans_id", "count"),
     avg_amount = ("settlement_amount", "mean"),    
     top_category = ("alibaba_category", lambda x: x.value_counts().idxmax()),
     top_payment = ("payment_method", lambda x: x.value_counts().idxmax()),
@@ -72,7 +74,7 @@ df["fraud_label"] = df["fraud_flag"].apply(lambda x: "Fraud Suspected" if x == -
 #API - Mulai backend
 app = FastAPI()
 
-api_key = "sk-9dbfdef5a1864d14a120f1b1009f0137" 
+api_key = os.getenv("QWEN_API_KEY")
 url = "https://dashscope-intl.aliyuncs.com/api/v1/services/aigc/text-generation/generation"
 
 async def get_ai_recommendation(prompt_content: str):
@@ -238,7 +240,6 @@ async def dashboard():
         "this_month_status_percent": this_month_status_percent,
         
         "ai recommendation" : ai_advice,   
-        
     }
     
 
