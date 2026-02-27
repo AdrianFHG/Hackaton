@@ -231,9 +231,9 @@ async def dashboard():
         "this_month_fear_greed_score": this_month["fear_greed"],
         "this_month_fear_greed_label": this_month_fear_greed_label,
         #revenue & growth
-        "this_month_revenue_growth": this_month["revenue_growth"],
-        "this_month_expense_growth": this_month["expense_growth"],
-        "this_month_profit": this_month["profit"],
+        "this_month_revenue_growth": this_month["revenue_growth"].round(2),
+        "this_month_expense_growth": this_month["expense_growth"].round(2),
+        "this_month_profit": this_month["profit"].round(2),
         #chart revenue vs expense
         "chart_data":chart_data,
         #status percent
